@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tank 1990 - ESP32 Simulator</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .simulator-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .simulator-header h1 {
+            color: #2196F3;
+            font-size: 2em;
+        }
+
+        .simulator-wrapper {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .login-panel {
+            max-width: 400px;
+            margin: 100px auto;
+        }
+
+        .simulator-main {
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .esp32-device {
+            background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+            border: 2px solid #444;
+        }
+
+        .device-label {
+            text-align: center;
+            color: #888;
+            font-size: 0.8em;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .device-screen {
+            width: 220px;
+            height: 120px;
+            background: #001a00;
+            border: 4px solid #333;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            padding: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            color: #0f0;
+            overflow: hidden;
+            box-shadow: inset 0 0 20px rgba(0, 255, 0, 0.1);
+        }
+
+        .screen-line {
+            margin: 2px 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .screen-line.status {
+            color: #0ff;
+        }
+
+        .screen-line.error {
+            color: #f00;
+        }
+
+        .device-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .device-btn {
+            width: 55px;
+            height: 55px;
+            border-radius: 50%;
+            border: 3px solid #555;
+            font-size: 1.3em;
+            cursor: pointer;
+            transition: all 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+        }
+
+        .device-btn:active, .device-btn.pressed {
+            transform: scale(0.92);
+            box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.5);
+        }
+
+        .btn-nav {
+            background: linear-gradient(145deg, #555, #333);
+            color: #fff;
+        }
+
+        .btn-nav:hover {
+            background: linear-gradient(145deg, #666, #444);
+        }
+
+        .btn-fire {
+            background: linear-gradient(145deg, #e53935, #b71c1c);
+            color: #fff;
+            box-shadow: 0 0 15px rgba(229, 57, 53, 0.4);
+            width: 65px;
+            height: 65px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+
+        .btn-fire:hover {
+            box-shadow: 0 0 25px rgba(229, 57, 53, 0.6);
+        }
+
+        .btn-fire:active, .btn-fire.pressed {
+            background: linear-gradient(145deg, #c62828, #8e0000);
+        }
+
+        .btn-placeholder {
+            width: 55px;
+            height: 55px;
+            visibility: hidden;
+        }
+
+        .config-panel {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid #444;
+            border-radius: 15px;
+            padding: 25px;
+            min-width: 300px;
+        }
+
+        .config-panel h3 {
+            color: #2196F3;
+            margin-bottom: 20px;
+            font-size: 1em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .config-group {
+            margin-bottom: 20px;
+        }
+
+        .config-group label {
+            display: block;
+            color: #aaa;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+        }
+
+        .config-group input[type="text"],
+        .config-group input[type="url"] {
+            width: 100%;
+            padding: 10px 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid #555;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 0.95em;
+        }
+
+        .config-group input:focus {
+            outline: none;
+            border-color: #2196F3;
+        }
+
+        .color-row {
+            display: flex;
+            gap: 15px;
+        }
+
+        .color-row > div {
+            flex: 1;
+        }
+
+        .color-row input[type="color"] {
+            width: 100%;
+            height: 40px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .btn-connect {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #2196F3, #1565C0);
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-connect:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(33, 150, 243, 0.4);
+        }
+
+        .btn-connect:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-disconnect {
+            background: linear-gradient(135deg, #f44336, #c62828);
+        }
+
+        .btn-disconnect:hover {
+            box-shadow: 0 5px 20px rgba(244, 67, 54, 0.4);
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #666;
+        }
+
+        .status-dot.connected {
+            background: #4CAF50;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+
+        .status-dot.connecting {
+            background: #FF9800;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .keyboard-hint {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 0.85em;
+            color: #888;
+        }
+
+        .keyboard-hint h4 {
+            color: #aaa;
+            margin-bottom: 10px;
+        }
+
+        .keyboard-hint kbd {
+            background: #444;
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin: 0 3px;
+        }
+
+        .back-link {
+            color: #2196F3;
+            text-decoration: none;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .led-indicators {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .led {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .led-light {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #333;
+        }
+
+        .led-light.power {
+            background: #4CAF50;
+            box-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
+        }
+
+        .led-light.tx {
+            background: #333;
+        }
+
+        .led-light.tx.active {
+            background: #2196F3;
+            box-shadow: 0 0 8px rgba(33, 150, 243, 0.6);
+        }
+
+        .led span {
+            font-size: 0.65em;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="login-screen">
+        <div class="panel login-panel">
+            <h1>ESP32 SIMULATOR</h1>
+            <p style="color: #888; margin-bottom: 20px;">Admin access required</p>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="admin-password">Admin Password</label>
+                    <input type="password" id="admin-password" placeholder="Enter admin password" required>
+                </div>
+                <button type="submit" class="btn-join">ACCESS SIMULATOR</button>
+                <p id="login-error" style="color: #f44336; margin-top: 15px; display: none;">Invalid password</p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Simulator -->
+    <div id="simulator-panel" class="hidden">
+        <div class="simulator-wrapper">
+            <a href="/admin.html" class="back-link">&larr; Back to Admin Panel</a>
+
+            <div class="simulator-header">
+                <h1>ESP32 TANK CONTROLLER SIMULATOR</h1>
+                <p style="color: #888;">Simulates an ESP32 device with physical buttons</p>
+            </div>
+
+            <div class="simulator-main">
+                <!-- ESP32 Device -->
+                <div class="esp32-device">
+                    <div class="device-label">ESP32 DevKit v1</div>
+
+                    <div class="device-screen" id="device-screen">
+                        <div class="screen-line">Tank 1990 Controller</div>
+                        <div class="screen-line">-------------------</div>
+                        <div class="screen-line status">Status: Disconnected</div>
+                        <div class="screen-line">Press CONNECT to start</div>
+                    </div>
+
+                    <div class="device-controls">
+                        <div class="control-row">
+                            <div class="btn-placeholder"></div>
+                            <button class="device-btn btn-nav" id="btn-up" data-dir="up">&#9650;</button>
+                            <div class="btn-placeholder"></div>
+                        </div>
+                        <div class="control-row">
+                            <button class="device-btn btn-nav" id="btn-left" data-dir="left">&#9664;</button>
+                            <button class="device-btn btn-fire" id="btn-fire">FIRE</button>
+                            <button class="device-btn btn-nav" id="btn-right" data-dir="right">&#9654;</button>
+                        </div>
+                        <div class="control-row">
+                            <div class="btn-placeholder"></div>
+                            <button class="device-btn btn-nav" id="btn-down" data-dir="down">&#9660;</button>
+                            <div class="btn-placeholder"></div>
+                        </div>
+                    </div>
+
+                    <div class="led-indicators">
+                        <div class="led">
+                            <div class="led-light power"></div>
+                            <span>PWR</span>
+                        </div>
+                        <div class="led">
+                            <div class="led-light tx" id="led-tx"></div>
+                            <span>TX</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Configuration Panel -->
+                <div class="config-panel">
+                    <div class="status-indicator">
+                        <div class="status-dot" id="status-dot"></div>
+                        <span id="status-text">Disconnected</span>
+                    </div>
+
+                    <h3>Device Configuration</h3>
+
+                    <div class="config-group">
+                        <label for="sim-name">Tank Name</label>
+                        <input type="text" id="sim-name" value="ESP32_Tank" maxlength="15">
+                    </div>
+
+                    <div class="config-group">
+                        <label>Tank Colors</label>
+                        <div class="color-row">
+                            <div>
+                                <label style="font-size: 0.8em;">Primary</label>
+                                <input type="color" id="sim-primary" value="#9C27B0">
+                            </div>
+                            <div>
+                                <label style="font-size: 0.8em;">Secondary</label>
+                                <input type="color" id="sim-secondary" value="#7B1FA2">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="config-group">
+                        <label for="sim-avatar">Avatar URL</label>
+                        <input type="url" id="sim-avatar" placeholder="https://example.com/avatar.png">
+                    </div>
+
+                    <button class="btn-connect" id="btn-connect" onclick="toggleConnection()">CONNECT</button>
+
+                    <div class="keyboard-hint">
+                        <h4>Keyboard Controls</h4>
+                        <p><kbd>W</kbd> or <kbd>&#8593;</kbd> - Move Forward</p>
+                        <p><kbd>S</kbd> or <kbd>&#8595;</kbd> - Move Backward</p>
+                        <p><kbd>A</kbd> or <kbd>&#8592;</kbd> - Rotate Left</p>
+                        <p><kbd>D</kbd> or <kbd>&#8594;</kbd> - Rotate Right</p>
+                        <p><kbd>Space</kbd> - Fire</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let gameWs = null;
+        let isAdmin = false;
+        let isConnected = false;
+        let playerId = null;
+        let adminPassword = null; // Store admin password for game connection
+        let moving = { up: false, down: false, left: false, right: false };
+
+        // Login form
+        document.getElementById('login-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            authenticateAdmin();
+        });
+
+        function authenticateAdmin() {
+            const password = document.getElementById('admin-password').value;
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}`);
+
+            ws.onopen = () => {
+                ws.send(JSON.stringify({
+                    type: 'adminLogin',
+                    password: password
+                }));
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'adminLoginSuccess') {
+                    isAdmin = true;
+                    adminPassword = password; // Store the password for later use
+                    document.getElementById('login-screen').classList.add('hidden');
+                    document.getElementById('simulator-panel').classList.remove('hidden');
+                    initSimulator();
+                } else if (data.type === 'adminLoginFailed') {
+                    document.getElementById('login-error').style.display = 'block';
+                }
+            };
+        }
+
+        function initSimulator() {
+            // Button press handlers
+            const buttons = document.querySelectorAll('.device-btn');
+            buttons.forEach(btn => {
+                btn.addEventListener('mousedown', () => handleButtonPress(btn, true));
+                btn.addEventListener('mouseup', () => handleButtonPress(btn, false));
+                btn.addEventListener('mouseleave', () => handleButtonPress(btn, false));
+                btn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    handleButtonPress(btn, true);
+                });
+                btn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    handleButtonPress(btn, false);
+                });
+            });
+
+            // Keyboard controls
+            document.addEventListener('keydown', (e) => {
+                if (!isConnected) return;
+                handleKeyboard(e.code, true);
+            });
+
+            document.addEventListener('keyup', (e) => {
+                if (!isConnected) return;
+                handleKeyboard(e.code, false);
+            });
+        }
+
+        function handleButtonPress(btn, pressed) {
+            if (!isConnected) return;
+
+            btn.classList.toggle('pressed', pressed);
+
+            if (btn.id === 'btn-fire') {
+                if (pressed) {
+                    sendCommand('fire');
+                }
+            } else {
+                const dir = btn.dataset.dir;
+                if (dir) {
+                    moving[dir] = pressed;
+                    sendMovement();
+                }
+            }
+        }
+
+        function handleKeyboard(code, pressed) {
+            const btnMap = {
+                'KeyW': 'btn-up',
+                'ArrowUp': 'btn-up',
+                'KeyS': 'btn-down',
+                'ArrowDown': 'btn-down',
+                'KeyA': 'btn-left',
+                'ArrowLeft': 'btn-left',
+                'KeyD': 'btn-right',
+                'ArrowRight': 'btn-right',
+                'Space': 'btn-fire'
+            };
+
+            const dirMap = {
+                'KeyW': 'up',
+                'ArrowUp': 'up',
+                'KeyS': 'down',
+                'ArrowDown': 'down',
+                'KeyA': 'left',
+                'ArrowLeft': 'left',
+                'KeyD': 'right',
+                'ArrowRight': 'right'
+            };
+
+            const btnId = btnMap[code];
+            if (btnId) {
+                const btn = document.getElementById(btnId);
+                if (btn) {
+                    btn.classList.toggle('pressed', pressed);
+                }
+
+                if (code === 'Space') {
+                    if (pressed) {
+                        sendCommand('fire');
+                    }
+                } else {
+                    const dir = dirMap[code];
+                    if (dir) {
+                        moving[dir] = pressed;
+                        sendMovement();
+                    }
+                }
+            }
+        }
+
+        function sendMovement() {
+            if (gameWs && gameWs.readyState === WebSocket.OPEN) {
+                gameWs.send(JSON.stringify({ type: 'move', moving }));
+                flashTxLed();
+            }
+        }
+
+        function sendCommand(cmd) {
+            if (gameWs && gameWs.readyState === WebSocket.OPEN) {
+                gameWs.send(JSON.stringify({ type: cmd }));
+                flashTxLed();
+            }
+        }
+
+        function flashTxLed() {
+            const led = document.getElementById('led-tx');
+            led.classList.add('active');
+            setTimeout(() => led.classList.remove('active'), 100);
+        }
+
+        function toggleConnection() {
+            if (isConnected) {
+                disconnect();
+            } else {
+                connect();
+            }
+        }
+
+        function connect() {
+            const name = document.getElementById('sim-name').value;
+            const primaryColor = document.getElementById('sim-primary').value;
+            const secondaryColor = document.getElementById('sim-secondary').value;
+            const avatarUrl = document.getElementById('sim-avatar').value;
+
+            updateScreen([
+                'Tank 1990 Controller',
+                '-------------------',
+                'Connecting...',
+                `Name: ${name}`
+            ], 'connecting');
+
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            gameWs = new WebSocket(`${protocol}//${window.location.host}`);
+
+            gameWs.onopen = () => {
+                // Use simulatorJoin which requires admin password
+                gameWs.send(JSON.stringify({
+                    type: 'simulatorJoin',
+                    adminPassword: adminPassword,
+                    name,
+                    primaryColor,
+                    secondaryColor,
+                    avatarUrl
+                }));
+            };
+
+            gameWs.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleGameMessage(data);
+            };
+
+            gameWs.onclose = () => {
+                if (isConnected) {
+                    disconnect();
+                    updateScreen([
+                        'Tank 1990 Controller',
+                        '-------------------',
+                        'Connection lost!',
+                        'Press CONNECT'
+                    ], 'error');
+                }
+            };
+
+            gameWs.onerror = () => {
+                updateScreen([
+                    'Tank 1990 Controller',
+                    '-------------------',
+                    'Connection failed!',
+                    'Check server'
+                ], 'error');
+            };
+        }
+
+        function disconnect() {
+            if (gameWs) {
+                gameWs.close();
+                gameWs = null;
+            }
+            isConnected = false;
+            playerId = null;
+            moving = { up: false, down: false, left: false, right: false };
+
+            document.getElementById('status-dot').classList.remove('connected', 'connecting');
+            document.getElementById('status-text').textContent = 'Disconnected';
+            document.getElementById('btn-connect').textContent = 'CONNECT';
+            document.getElementById('btn-connect').classList.remove('btn-disconnect');
+
+            updateScreen([
+                'Tank 1990 Controller',
+                '-------------------',
+                'Disconnected',
+                'Press CONNECT'
+            ]);
+        }
+
+        function handleGameMessage(data) {
+            switch (data.type) {
+                case 'joined':
+                    isConnected = true;
+                    playerId = data.playerId;
+
+                    document.getElementById('status-dot').classList.remove('connecting');
+                    document.getElementById('status-dot').classList.add('connected');
+                    document.getElementById('status-text').textContent = 'Connected';
+                    document.getElementById('btn-connect').textContent = 'DISCONNECT';
+                    document.getElementById('btn-connect').classList.add('btn-disconnect');
+
+                    updateScreen([
+                        'Tank 1990 Controller',
+                        '-------------------',
+                        'CONNECTED!',
+                        `ID: ${playerId.slice(0, 8)}...`,
+                        'Ready to battle!'
+                    ], 'connected');
+                    break;
+
+                case 'error':
+                    updateScreen([
+                        'ERROR!',
+                        '-------------------',
+                        data.message || 'Unknown error',
+                        '',
+                        'Check credentials'
+                    ], 'error');
+                    break;
+
+                case 'gameState':
+                    if (playerId) {
+                        const myTank = data.tanks.find(t => t.id === playerId);
+                        if (myTank) {
+                            updateScreen([
+                                `HP: ${Math.round(myTank.hp)}/${myTank.maxHp}`,
+                                `Score: ${myTank.score}`,
+                                `Kills: ${myTank.kills}`,
+                                `Deaths: ${myTank.deaths}`,
+                                myTank.spawnProtection ? '[PROTECTED]' : ''
+                            ], 'connected');
+                        }
+                    }
+                    break;
+
+                case 'tankDeath':
+                    if (data.tankId === playerId) {
+                        updateScreen([
+                            'DESTROYED!',
+                            '-------------------',
+                            'Respawning...',
+                            '',
+                            'Stay alert!'
+                        ], 'error');
+                    }
+                    break;
+
+                case 'kicked':
+                    disconnect();
+                    updateScreen([
+                        'KICKED!',
+                        '-------------------',
+                        'You have been',
+                        'removed from game'
+                    ], 'error');
+                    break;
+            }
+        }
+
+        function updateScreen(lines, status = '') {
+            const screen = document.getElementById('device-screen');
+            const statusDot = document.getElementById('status-dot');
+
+            screen.innerHTML = lines.map((line, i) => {
+                let className = 'screen-line';
+                if (status === 'connected' && i === 2) className += ' status';
+                if (status === 'error' && i === 0) className += ' error';
+                return `<div class="${className}">${line}</div>`;
+            }).join('');
+
+            if (status === 'connecting') {
+                statusDot.classList.add('connecting');
+                statusDot.classList.remove('connected');
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tank 1990 - Admin Panel</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .admin-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .admin-header h1 {
+            color: #f44336;
+            font-size: 2.5em;
+        }
+
+        .admin-header p {
+            color: #888;
+        }
+
+        .login-panel {
+            max-width: 400px;
+            margin: 100px auto;
+        }
+
+        .admin-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 900px) {
+            .admin-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .bot-config {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .bot-config input[type="color"] {
+            width: 50px;
+            height: 38px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-card .value {
+            font-size: 2em;
+            color: #4CAF50;
+            font-weight: bold;
+        }
+
+        .stat-card .label {
+            color: #888;
+            font-size: 0.9em;
+        }
+
+        .view-game-link {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .simulator-link {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #2196F3;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 8px;
+            margin-left: 10px;
+        }
+
+        .refresh-btn {
+            background: #666;
+            color: #fff;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="login-screen">
+        <div class="panel login-panel">
+            <h1>ADMIN LOGIN</h1>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="admin-password">Password</label>
+                    <input type="password" id="admin-password" placeholder="Enter admin password" required>
+                </div>
+                <button type="submit" class="btn-join">LOGIN</button>
+                <p id="login-error" style="color: #f44336; margin-top: 15px; display: none;">Invalid password</p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Admin Panel -->
+    <div id="admin-panel" class="hidden">
+        <div class="admin-header">
+            <h1>TANK 1990 ADMIN</h1>
+            <p>Server Control Panel</p>
+            <a href="/" class="view-game-link">View Game</a>
+            <a href="/simulator.html" class="simulator-link">ESP32 Simulator</a>
+        </div>
+
+        <div class="admin-grid">
+            <!-- Server Stats -->
+            <div class="admin-section">
+                <h3>SERVER STATISTICS <button class="refresh-btn" onclick="refreshPlayers()">Refresh</button></h3>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="value" id="stat-players">0</div>
+                        <div class="label">Players</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="value" id="stat-bots">0</div>
+                        <div class="label">Bots</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="value" id="stat-total">0</div>
+                        <div class="label">Total</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bot Control -->
+            <div class="admin-section">
+                <h3>BOT CONTROL</h3>
+                <div class="bot-config">
+                    <input type="color" id="bot-primary" value="#FF5722" title="Primary Color">
+                    <input type="color" id="bot-secondary" value="#E64A19" title="Secondary Color">
+                    <button class="btn-spawn" onclick="spawnBot()">Spawn Bot</button>
+                </div>
+                <p style="color: #888; font-size: 0.9em;">Bots will automatically roam and attack players</p>
+            </div>
+
+            <!-- Player Management -->
+            <div class="admin-section">
+                <h3>PLAYER MANAGEMENT</h3>
+                <div class="player-list" id="player-list">
+                    <p style="color: #888; text-align: center;">No players connected</p>
+                </div>
+            </div>
+
+            <!-- Scoreboard Control -->
+            <div class="admin-section">
+                <h3>SCOREBOARD</h3>
+                <div id="admin-scoreboard"></div>
+                <button class="btn-reset" onclick="resetScoreboard()" style="margin-top: 15px;">Reset All Scores</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let isAdmin = false;
+
+        document.getElementById('login-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            connectAsAdmin();
+        });
+
+        function connectAsAdmin() {
+            const password = document.getElementById('admin-password').value;
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}`);
+
+            ws.onopen = () => {
+                ws.send(JSON.stringify({
+                    type: 'adminLogin',
+                    password: password
+                }));
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleMessage(data);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+
+            ws.onclose = () => {
+                if (isAdmin) {
+                    alert('Connection lost. Please refresh the page.');
+                }
+            };
+        }
+
+        function handleMessage(data) {
+            switch (data.type) {
+                case 'adminLoginSuccess':
+                    isAdmin = true;
+                    document.getElementById('login-screen').classList.add('hidden');
+                    document.getElementById('admin-panel').classList.remove('hidden');
+                    refreshPlayers();
+                    break;
+
+                case 'adminLoginFailed':
+                    document.getElementById('login-error').style.display = 'block';
+                    break;
+
+                case 'playerList':
+                    updatePlayerList(data.players);
+                    break;
+
+                case 'scoreboardUpdate':
+                    updateAdminScoreboard(data.scoreboard);
+                    break;
+
+                case 'playerJoined':
+                case 'playerLeft':
+                    refreshPlayers();
+                    break;
+            }
+        }
+
+        function refreshPlayers() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'adminGetPlayers' }));
+            }
+        }
+
+        function updatePlayerList(players) {
+            const list = document.getElementById('player-list');
+            const humanPlayers = players.filter(p => !p.isBot);
+            const bots = players.filter(p => p.isBot);
+
+            document.getElementById('stat-players').textContent = humanPlayers.length;
+            document.getElementById('stat-bots').textContent = bots.length;
+            document.getElementById('stat-total').textContent = players.length;
+
+            if (players.length === 0) {
+                list.innerHTML = '<p style="color: #888; text-align: center;">No players connected</p>';
+                return;
+            }
+
+            list.innerHTML = players.map(player => `
+                <div class="player-item ${player.isBot ? 'bot' : ''}">
+                    <div>
+                        <strong>${player.name}</strong>
+                        ${player.isBot ? '<span style="color: #FF9800;">[BOT]</span>' : ''}
+                        <span style="color: #888; margin-left: 10px;">Score: ${player.score}</span>
+                    </div>
+                    <div class="player-actions">
+                        ${player.isBot ? `
+                            <button class="btn-remove" onclick="removeBot('${player.id}')">Remove</button>
+                        ` : `
+                            <button class="btn-kick" onclick="kickPlayer('${player.id}')">Kick</button>
+                            <button class="btn-ban" onclick="banPlayer('${player.id}')">Ban</button>
+                        `}
+                    </div>
+                </div>
+            `).join('');
+
+            updateAdminScoreboard(players.sort((a, b) => b.score - a.score));
+        }
+
+        function updateAdminScoreboard(scoreboard) {
+            const container = document.getElementById('admin-scoreboard');
+            if (!scoreboard || scoreboard.length === 0) {
+                container.innerHTML = '<p style="color: #888; text-align: center;">No scores yet</p>';
+                return;
+            }
+
+            container.innerHTML = scoreboard.slice(0, 10).map((entry, index) => `
+                <div class="scoreboard-entry ${entry.isBot ? 'bot' : ''}">
+                    <span class="scoreboard-rank">#${index + 1}</span>
+                    <span class="scoreboard-name">${entry.name}${entry.isBot ? ' [BOT]' : ''}</span>
+                    <span class="scoreboard-score">${entry.score}</span>
+                </div>
+            `).join('');
+        }
+
+        function spawnBot() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'adminSpawnBot',
+                    primaryColor: document.getElementById('bot-primary').value,
+                    secondaryColor: document.getElementById('bot-secondary').value
+                }));
+                setTimeout(refreshPlayers, 500);
+            }
+        }
+
+        function removeBot(botId) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'adminRemoveBot',
+                    botId: botId
+                }));
+                setTimeout(refreshPlayers, 500);
+            }
+        }
+
+        function kickPlayer(playerId) {
+            if (confirm('Are you sure you want to kick this player?')) {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'adminKick',
+                        targetId: playerId
+                    }));
+                    setTimeout(refreshPlayers, 500);
+                }
+            }
+        }
+
+        function banPlayer(playerId) {
+            if (confirm('Are you sure you want to BAN this player? They will not be able to reconnect.')) {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'adminBan',
+                        targetId: playerId
+                    }));
+                    setTimeout(refreshPlayers, 500);
+                }
+            }
+        }
+
+        function resetScoreboard() {
+            if (confirm('Are you sure you want to reset ALL scores?')) {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'adminResetScoreboard' }));
+                    setTimeout(refreshPlayers, 500);
+                }
+            }
+        }
+
+        // Auto-refresh every 5 seconds
+        setInterval(() => {
+            if (isAdmin) {
+                refreshPlayers();
+            }
+        }, 5000);
+    </script>
+</body>
+</html>
