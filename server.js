@@ -48,8 +48,8 @@ let gameState = {
 const OBSTACLE_TYPES = {
     TREE: { hp: 30, destructible: true, color: '#228B22', points: 5 },
     WALL: { hp: 150, destructible: true, color: '#808080', points: 10 },
-    BARREL: { hp: 20, destructible: true, color: '#8B4513', explosive: true, explosionRadius: 80, explosionDamage: 50, points: 15 },
-    CRATE: { hp: 40, destructible: true, color: '#DEB887', containsPowerup: true, points: 20 }
+    BARREL: { hp: 20, destructible: true, color: '#8B4513', explosive: true, explosionRadius: 150, explosionDamage: 100, points: 5 },
+    CRATE: { hp: 40, destructible: true, color: '#DEB887', containsPowerup: true, points: 5 }
 };
 
 // Powerup types configuration
@@ -517,11 +517,31 @@ function updateGame() {
 
         // Check obstacle collisions
         let canMove = true;
+        let barrelToExplode = null;
         gameState.obstacles.forEach(obs => {
             if (distance({ x: newX, y: newY }, obs) < (CONFIG.TANK_SIZE + obs.size) / 2) {
-                canMove = false;
+                if (obs.type === 'BARREL') {
+                    barrelToExplode = obs;
+                } else {
+                    canMove = false;
+                }
             }
         });
+
+        // Handle barrel collision - tank bumps into it and it explodes
+        if (barrelToExplode) {
+            const obsIndex = gameState.obstacles.indexOf(barrelToExplode);
+            if (obsIndex > -1) {
+                gameState.obstacles.splice(obsIndex, 1);
+                const posBeforeExplosion = { x: tank.x, y: tank.y };
+                createExplosion(barrelToExplode.x, barrelToExplode.y, barrelToExplode.config.explosionRadius, barrelToExplode.config.explosionDamage);
+                broadcast({ type: 'obstacleDestroyed', obstacleId: barrelToExplode.id });
+                // If tank died and respawned, don't overwrite its new position
+                if (tank.x !== posBeforeExplosion.x || tank.y !== posBeforeExplosion.y) {
+                    return; // Tank respawned to new location, skip position update
+                }
+            }
+        }
 
         if (canMove) {
             tank.x = newX;

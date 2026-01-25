@@ -180,6 +180,8 @@
                         const killer = this.gameState.tanks.find(t => t.id === data.killerId);
                         if (victim && killer) {
                             this.addKillFeedMessage(`${killer.name} destroyed ${victim.name}`);
+                        } else if (victim && !data.killerId) {
+                            this.addKillFeedMessage(`💣 ${victim.name} was blown up!`);
                         }
                         break;
 
@@ -497,15 +499,10 @@
                         break;
 
                     case 'BARREL':
-                        ctx.fillStyle = color;
-                        ctx.beginPath();
-                        ctx.ellipse(0, 0, size / 2.5, size / 2, 0, 0, Math.PI * 2);
-                        ctx.fill();
-                        ctx.fillStyle = '#FFD700';
-                        ctx.font = 'bold 16px Arial';
+                        ctx.font = `${size}px Arial`;
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
-                        ctx.fillText('!', 0, 0);
+                        ctx.fillText('💣', 0, 0);
                         break;
 
                     case 'CRATE':
