@@ -102,6 +102,7 @@
                     powerups: []
                 };
                 this.explosions = [];
+                this.powerupEffects = [];
                 this.cameraTarget = null;
                 this.cameraX = 0;
                 this.cameraY = 0;
@@ -194,6 +195,9 @@
                         if (collector) {
                             this.addKillFeedMessage(`${collector.name} got ${data.powerupType}`, 'powerup');
                         }
+                        if (data.x !== undefined && data.y !== undefined) {
+                            this.createPowerupEffect(data.x, data.y, data.powerupType);
+                        }
                         break;
 
                     case 'scoreboardUpdate':
@@ -245,11 +249,27 @@
                 });
             }
 
+            createPowerupEffect(x, y, type) {
+                const icons = {
+                    SPEED: '⚡',
+                    POWER: '💪',
+                    HEALTH: '❤️',
+                    RANGE: '🎯',
+                    INVINCIBILITY: '⭐'
+                };
+                this.powerupEffects.push({
+                    x, y,
+                    icon: icons[type] || '?',
+                    startTime: Date.now()
+                });
+            }
+
             startGameLoop() {
                 const loop = () => {
                     this.updateCamera();
                     this.render();
                     this.updateExplosions();
+                    this.updatePowerupEffects();
                     requestAnimationFrame(loop);
                 };
                 requestAnimationFrame(loop);
@@ -327,6 +347,7 @@
                 }
 
                 this.explosions.forEach(exp => this.drawExplosion(exp));
+                this.powerupEffects.forEach(eff => this.drawPowerupEffect(eff));
 
                 ctx.restore();
             }
@@ -597,6 +618,38 @@
             updateExplosions() {
                 const now = Date.now();
                 this.explosions = this.explosions.filter(exp => now - exp.startTime < 500);
+            }
+
+            drawPowerupEffect(effect) {
+                const ctx = this.ctx;
+                const elapsed = Date.now() - effect.startTime;
+                const duration = 800;
+
+                if (elapsed > duration) return;
+
+                const progress = elapsed / duration;
+                const floatY = effect.y - (progress * 60); // Float upward 60 pixels
+                const scale = 1 + progress * 1.5; // Expand from 1x to 2.5x
+                const alpha = 1 - progress; // Fade out
+                const rotation = progress * Math.PI * 2; // Full rotation
+
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.translate(effect.x, floatY);
+                ctx.rotate(rotation);
+                ctx.scale(scale, scale);
+
+                ctx.font = 'bold 24px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(effect.icon, 0, 0);
+
+                ctx.restore();
+            }
+
+            updatePowerupEffects() {
+                const now = Date.now();
+                this.powerupEffects = this.powerupEffects.filter(eff => now - eff.startTime < 800);
             }
         }
 

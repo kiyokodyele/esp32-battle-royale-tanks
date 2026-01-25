@@ -552,7 +552,7 @@ function updateGame() {
         gameState.powerups = gameState.powerups.filter(powerup => {
             if (distance(tank, powerup) < (CONFIG.TANK_SIZE + powerup.size) / 2) {
                 tank.applyPowerup(powerup.type);
-                broadcast({ type: 'powerupCollect', tankId: tank.id, powerupType: powerup.type });
+                broadcast({ type: 'powerupCollect', tankId: tank.id, powerupType: powerup.type, x: powerup.x, y: powerup.y });
                 return false;
             }
             return true;
