@@ -22,7 +22,7 @@ const CONFIG = {
     BASE_FIRE_RATE: 500,
     BASE_DAMAGE: 25,
     BASE_HEALTH: 100,
-    BASE_FIRE_RANGE: 300,
+    BASE_FIRE_RANGE: 500,
     SPAWN_PROTECTION_TIME: 5000,
     OBSTACLE_SPAWN_INTERVAL: 5000,
     POWERUP_SPAWN_INTERVAL: 8000,
@@ -61,7 +61,8 @@ const POWERUP_TYPES = {
     POWER: { color: '#FF0000', effect: 'damage', multiplier: 1.5, icon: '💪', duration: 0, maxStacks: 3 },
     HEALTH: { color: '#00FF00', effect: 'health', amount: 50, icon: '❤️', duration: 0, maxStacks: 1 },
     RANGE: { color: '#FFFF00', effect: 'range', multiplier: 1.3, icon: '🎯', duration: 0, maxStacks: 3 },
-    INVINCIBILITY: { color: '#FFD700', effect: 'invincible', icon: '⭐', duration: 10, maxStacks: 1 }
+    INVINCIBILITY: { color: '#FFD700', effect: 'invincible', icon: '⭐', duration: 10, maxStacks: 1 },
+    MYSTERY: { color: '#da892dff', effect: 'mystery', icon: '❓', duration: 0, maxStacks: 1, explodeChance: 0.50, explosionRadius: 120, explosionDamage: 80 }
 };
 
 // Helper functions
@@ -551,8 +552,24 @@ function updateGame() {
         // Check powerup collisions
         gameState.powerups = gameState.powerups.filter(powerup => {
             if (distance(tank, powerup) < (CONFIG.TANK_SIZE + powerup.size) / 2) {
-                tank.applyPowerup(powerup.type);
-                broadcast({ type: 'powerupCollect', tankId: tank.id, powerupType: powerup.type, x: powerup.x, y: powerup.y });
+                // Handle MYSTERY powerup specially
+                if (powerup.type === 'MYSTERY') {
+                    const mysteryConfig = POWERUP_TYPES.MYSTERY;
+                    if (Math.random() < mysteryConfig.explodeChance) {
+                        // Bad luck - it explodes!
+                        broadcast({ type: 'mysteryExplode', tankId: tank.id, x: powerup.x, y: powerup.y, radius: mysteryConfig.explosionRadius });
+                        createExplosion(powerup.x, powerup.y, mysteryConfig.explosionRadius, mysteryConfig.explosionDamage);
+                    } else {
+                        // Good luck - give a random real powerup
+                        const realPowerups = ['SPEED', 'POWER', 'HEALTH', 'RANGE', 'INVINCIBILITY'];
+                        const randomType = realPowerups[Math.floor(Math.random() * realPowerups.length)];
+                        tank.applyPowerup(randomType);
+                        broadcast({ type: 'powerupCollect', tankId: tank.id, powerupType: randomType, x: powerup.x, y: powerup.y, wasMystery: true });
+                    }
+                } else {
+                    tank.applyPowerup(powerup.type);
+                    broadcast({ type: 'powerupCollect', tankId: tank.id, powerupType: powerup.type, x: powerup.x, y: powerup.y });
+                }
                 return false;
             }
             return true;

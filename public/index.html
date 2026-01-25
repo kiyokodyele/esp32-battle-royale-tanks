@@ -190,10 +190,24 @@
                         this.createExplosionEffect(data.x, data.y, data.radius);
                         break;
 
+                    case 'mysteryExplode':
+                        // Show bomb emoji animation + explosion
+                        this.createPowerupEffect(data.x, data.y, 'BOMB');
+                        this.createExplosionEffect(data.x, data.y, data.radius || 80);
+                        const unluckyTank = this.gameState.tanks.find(t => t.id === data.tankId);
+                        if (unluckyTank) {
+                            this.addKillFeedMessage(`💣 ${unluckyTank.name} opened a trap!`);
+                        }
+                        break;
+
                     case 'powerupCollect':
                         const collector = this.gameState.tanks.find(t => t.id === data.tankId);
                         if (collector) {
-                            this.addKillFeedMessage(`${collector.name} got ${data.powerupType}`, 'powerup');
+                            if (data.wasMystery) {
+                                this.addKillFeedMessage(`🎁 ${collector.name} got ${data.powerupType} from mystery!`, 'powerup');
+                            } else {
+                                this.addKillFeedMessage(`${collector.name} got ${data.powerupType}`, 'powerup');
+                            }
                         }
                         if (data.x !== undefined && data.y !== undefined) {
                             this.createPowerupEffect(data.x, data.y, data.powerupType);
@@ -255,7 +269,9 @@
                     POWER: '💪',
                     HEALTH: '❤️',
                     RANGE: '🎯',
-                    INVINCIBILITY: '⭐'
+                    INVINCIBILITY: '⭐',
+                    MYSTERY: '❓',
+                    BOMB: '💣'
                 };
                 this.powerupEffects.push({
                     x, y,
@@ -557,7 +573,8 @@
                     POWER: { color: '#FF0000', icon: '💪' },
                     HEALTH: { color: '#00FF00', icon: '❤️' },
                     RANGE: { color: '#FFFF00', icon: '🎯' },
-                    INVINCIBILITY: { color: '#FFD700', icon: '⭐' }
+                    INVINCIBILITY: { color: '#FFD700', icon: '⭐' },
+                    MYSTERY: { color: '#9932CC', icon: '❓' }
                 }[powerup.type] || { color: '#fff', icon: '?' };
 
                 ctx.save();
