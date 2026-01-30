@@ -28,8 +28,8 @@ const CONFIG = {
     POWERUP_SPAWN_INTERVAL: 8000,
     MAX_OBSTACLES: 30,
     MAX_POWERUPS: 5,
-    ADMIN_PASSWORD: '09877890',
-    BOT_REACTION_TIME: 500,
+    ADMIN_PASSWORD: 'TankDestroyer',
+    BOT_REACTION_TIME: 2000,
     TICK_RATE: 60
 };
 
@@ -73,6 +73,53 @@ function randomPosition() {
     };
 }
 
+// Parse hex color to RGB
+function hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+    } : null;
+}
+
+// Calculate color brightness (0-255)
+function getColorBrightness(hex) {
+    const rgb = hexToRgb(hex);
+    if (!rgb) return 0;
+    // Using perceived brightness formula
+    return (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+}
+
+// Generate random bright color
+function randomBrightColor() {
+    const brightColors = [
+        '#FF5722', '#E91E63', '#9C27B0', '#673AB7',
+        '#3F51B5', '#2196F3', '#00BCD4', '#009688',
+        '#4CAF50', '#8BC34A', '#CDDC39', '#FFEB3B',
+        '#FFC107', '#FF9800', '#FF5722', '#F44336'
+    ];
+    return brightColors[Math.floor(Math.random() * brightColors.length)];
+}
+
+// Validate tank color - reject dark colors that camouflage with background
+function validateTankColor(color) {
+    if (!color || typeof color !== 'string') return randomBrightColor();
+
+    const brightness = getColorBrightness(color);
+    // Background is ~26 brightness (#1a1a1a), reject colors below 60 brightness
+    if (brightness < 60) {
+        return randomBrightColor();
+    }
+    return color;
+}
+
+// Sanitize tank name - trim and limit to 20 characters
+function sanitizeTankName(name) {
+    if (!name || typeof name !== 'string') return 'Unknown';
+    return name.trim().substring(0, 20) || 'Unknown';
+}
+
 function distance(a, b) {
     return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
 }
@@ -102,9 +149,9 @@ class Tank {
     constructor(id, name, primaryColor, secondaryColor, avatarUrl, isBot = false) {
         const spawnPos = findSafeSpawnPosition();
         this.id = id;
-        this.name = name || 'Unknown';
-        this.primaryColor = primaryColor || '#4CAF50';
-        this.secondaryColor = secondaryColor || '#2E7D32';
+        this.name = sanitizeTankName(name);
+        this.primaryColor = validateTankColor(primaryColor) || '#4CAF50';
+        this.secondaryColor = validateTankColor(secondaryColor) || '#2E7D32';
         this.avatarUrl = avatarUrl || '';
         this.x = spawnPos.x;
         this.y = spawnPos.y;
@@ -673,11 +720,11 @@ function updateScoreboard() {
     broadcast({ type: 'scoreboardUpdate', scoreboard: gameState.scoreboard });
 }
 
-// Broadcast to all clients
+// Broadcast to all clients (except ESP32 controllers which only send commands)
 function broadcast(data) {
     const message = JSON.stringify(data);
     wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
+        if (client.readyState === WebSocket.OPEN && !client.isESP32) {
             client.send(message);
         }
     });
@@ -892,6 +939,7 @@ wss.on('connection', (ws, req) => {
 
                 case 'esp32Join': {
                     // ESP32 devices can join directly with their fixed config
+                    // They only send commands and don't need game state feedback
                     playerId = uuidv4();
                     const espTank = new Tank(
                         playerId,
@@ -905,18 +953,10 @@ wss.on('connection', (ws, req) => {
                     ws.clientIP = clientIP;
                     ws.isESP32 = true;
 
+                    // Send minimal response to ESP32 - just playerId for command identification
                     sendTo(ws, {
                         type: 'joined',
-                        playerId,
-                        tank: espTank.toJSON(),
-                        config: CONFIG,
-                        gameState: {
-                            tanks: [...gameState.tanks.values()].map(t => t.toJSON()),
-                            bullets: gameState.bullets,
-                            obstacles: gameState.obstacles,
-                            powerups: gameState.powerups,
-                            scoreboard: gameState.scoreboard
-                        }
+                        playerId
                     });
 
                     broadcast({ type: 'playerJoined', tank: espTank.toJSON() });

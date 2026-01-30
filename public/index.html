@@ -103,6 +103,7 @@
                 };
                 this.explosions = [];
                 this.powerupEffects = [];
+                this.avatarCache = {}; // Cache for loaded avatar images
                 this.cameraTarget = null;
                 this.cameraX = 0;
                 this.cameraY = 0;
@@ -449,19 +450,30 @@
 
                 // Avatar in center of tank (on top of turret)
                 if (tank.avatarUrl) {
-                    ctx.save();
-                    ctx.rotate(-tank.angle || 0); // Counter-rotate so avatar stays upright
-                    const avatarSize = size / 2.5;
-                    const img = new Image();
-                    img.src = tank.avatarUrl;
-                    ctx.beginPath();
-                    ctx.arc(0, 0, avatarSize / 2, 0, Math.PI * 2);
-                    ctx.closePath();
-                    ctx.clip();
-                    try {
-                        ctx.drawImage(img, -avatarSize / 2, -avatarSize / 2, avatarSize, avatarSize);
-                    } catch (e) {}
-                    ctx.restore();
+                    // Use cached image or create and cache new one
+                    if (!this.avatarCache[tank.avatarUrl]) {
+                        const img = new Image();
+                        img.src = tank.avatarUrl;
+                        this.avatarCache[tank.avatarUrl] = { img: img, loaded: false };
+                        img.onload = () => {
+                            this.avatarCache[tank.avatarUrl].loaded = true;
+                        };
+                    }
+
+                    const cached = this.avatarCache[tank.avatarUrl];
+                    if (cached.loaded) {
+                        ctx.save();
+                        ctx.rotate(-tank.angle || 0); // Counter-rotate so avatar stays upright
+                        const avatarSize = size / 2.5;
+                        ctx.beginPath();
+                        ctx.arc(0, 0, avatarSize / 2, 0, Math.PI * 2);
+                        ctx.closePath();
+                        ctx.clip();
+                        try {
+                            ctx.drawImage(cached.img, -avatarSize / 2, -avatarSize / 2, avatarSize, avatarSize);
+                        } catch (e) {}
+                        ctx.restore();
+                    }
                 }
 
                 ctx.restore();

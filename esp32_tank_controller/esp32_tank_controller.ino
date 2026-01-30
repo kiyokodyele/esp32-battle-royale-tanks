@@ -8,7 +8,6 @@
  * - ESP32 DevKit or similar
  * - 4 Navigation buttons (UP, DOWN, LEFT, RIGHT)
  * - 1 Fire button
- * - Optional: OLED display (SSD1306 128x64)
  *
  * Button Wiring (Active LOW with internal pull-up):
  * - BTN_UP    -> GPIO 32
@@ -21,8 +20,6 @@
  * - WiFi (built-in)
  * - WebSocketsClient by Markus Sattler
  * - ArduinoJson by Benoit Blanchon
- * - Adafruit_SSD1306 (optional, for display)
- * - Adafruit_GFX (optional, for display)
  */
 
 #include <WiFi.h>
@@ -34,8 +31,8 @@
 // ============================================
 
 // WiFi Configuration
-const char* WIFI_SSID = "Erza";
-const char* WIFI_PASSWORD = "ErzaKnightw@lk3r";
+const char* WIFI_SSID = "Internet of Things";
+const char* WIFI_PASSWORD = "09877890";
 
 // Game Server Configuration
 const char* SERVER_HOST = "192.168.1.10";  // Change to your server IP
@@ -45,7 +42,7 @@ const int SERVER_PORT = 3000;
 const char* TANK_NAME = "SIR. PAGUIO";
 const char* PRIMARY_COLOR = "#03FCDF";    // Purple
 const char* SECONDARY_COLOR = "#FFFFFF";  // Dark Purple
-const char* AVATAR_URL = "https://www.kiyokodyele.com/assets/common/img/avatar/hhwCZDvjCs_1643950636.jpg";               // Optional avatar URL
+const char* AVATAR_URL = "https://icons.iconarchive.com/icons/papirus-team/papirus-apps/128/pingus-icon-icon.png";               // Optional avatar URL
 
 // ============================================
 // PIN DEFINITIONS
@@ -58,25 +55,6 @@ const char* AVATAR_URL = "https://www.kiyokodyele.com/assets/common/img/avatar/h
 #define BTN_FIRE  27
 
 #define LED_BUILTIN 2  // Built-in LED for status
-
-// ============================================
-// OPTIONAL: OLED DISPLAY
-// ============================================
-// Uncomment the following line to enable OLED display
-// #define USE_OLED_DISPLAY
-
-#ifdef USE_OLED_DISPLAY
-#include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
-
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
-#define OLED_RESET -1
-#define SCREEN_ADDRESS 0x3C
-
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-#endif
 
 // ============================================
 // GLOBAL VARIABLES
@@ -112,9 +90,7 @@ bool spawnProtection = false;
 
 // Timing
 unsigned long lastButtonCheck = 0;
-unsigned long lastDisplayUpdate = 0;
 const int BUTTON_CHECK_INTERVAL = 20;    // ms
-const int DISPLAY_UPDATE_INTERVAL = 100; // ms
 
 // Debounce
 unsigned long lastDebounceTime[5] = {0, 0, 0, 0, 0};
@@ -139,10 +115,6 @@ void setup() {
     // Status LED off initially
     digitalWrite(LED_BUILTIN, LOW);
 
-    #ifdef USE_OLED_DISPLAY
-    initDisplay();
-    #endif
-
     // Connect to WiFi
     connectWiFi();
 
@@ -166,14 +138,6 @@ void loop() {
         checkButtons();
     }
 
-    // Update display at regular intervals
-    #ifdef USE_OLED_DISPLAY
-    if (currentTime - lastDisplayUpdate >= DISPLAY_UPDATE_INTERVAL) {
-        lastDisplayUpdate = currentTime;
-        updateDisplay();
-    }
-    #endif
-
     // Blink LED when connected
     if (isConnected) {
         digitalWrite(LED_BUILTIN, (millis() / 500) % 2);
@@ -190,10 +154,6 @@ void connectWiFi() {
     Serial.print("Connecting to WiFi: ");
     Serial.println(WIFI_SSID);
 
-    #ifdef USE_OLED_DISPLAY
-    displayMessage("Connecting WiFi...", WIFI_SSID);
-    #endif
-
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
     int attempts = 0;
@@ -207,16 +167,8 @@ void connectWiFi() {
         Serial.println("\nWiFi connected!");
         Serial.print("IP Address: ");
         Serial.println(WiFi.localIP());
-
-        #ifdef USE_OLED_DISPLAY
-        displayMessage("WiFi Connected!", WiFi.localIP().toString().c_str());
-        delay(1000);
-        #endif
     } else {
         Serial.println("\nWiFi connection failed!");
-        #ifdef USE_OLED_DISPLAY
-        displayMessage("WiFi Failed!", "Restarting...");
-        #endif
         delay(3000);
         ESP.restart();
     }
@@ -232,10 +184,6 @@ void connectWebSocket() {
     Serial.print(":");
     Serial.println(SERVER_PORT);
 
-    #ifdef USE_OLED_DISPLAY
-    displayMessage("Connecting to", "Game Server...");
-    #endif
-
     webSocket.begin(SERVER_HOST, SERVER_PORT, "/");
     webSocket.onEvent(webSocketEvent);
     webSocket.setReconnectInterval(5000);
@@ -247,9 +195,6 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
             Serial.println("[WS] Disconnected!");
             isConnected = false;
             playerId = "";
-            #ifdef USE_OLED_DISPLAY
-            displayMessage("Disconnected!", "Reconnecting...");
-            #endif
             break;
 
         case WStype_CONNECTED:
@@ -303,11 +248,6 @@ void handleServerMessage(char* payload) {
         playerId = doc["playerId"].as<String>();
         Serial.print("[GAME] Joined! Player ID: ");
         Serial.println(playerId);
-
-        #ifdef USE_OLED_DISPLAY
-        displayMessage("CONNECTED!", TANK_NAME);
-        delay(1000);
-        #endif
     }
     else if (strcmp(type, "gameState") == 0) {
         // Find our tank in the game state
@@ -327,10 +267,6 @@ void handleServerMessage(char* payload) {
     else if (strcmp(type, "tankDeath") == 0) {
         if (doc["tankId"].as<String>() == playerId) {
             Serial.println("[GAME] You were destroyed!");
-            #ifdef USE_OLED_DISPLAY
-            displayMessage("DESTROYED!", "Respawning...");
-            delay(500);
-            #endif
         }
     }
     else if (strcmp(type, "powerupCollect") == 0) {
@@ -343,16 +279,10 @@ void handleServerMessage(char* payload) {
     else if (strcmp(type, "kicked") == 0) {
         Serial.println("[GAME] You have been kicked!");
         isConnected = false;
-        #ifdef USE_OLED_DISPLAY
-        displayMessage("KICKED!", "From server");
-        #endif
     }
     else if (strcmp(type, "banned") == 0) {
         Serial.println("[GAME] You have been banned!");
         isConnected = false;
-        #ifdef USE_OLED_DISPLAY
-        displayMessage("BANNED!", "From server");
-        #endif
     }
 }
 
@@ -448,105 +378,6 @@ void sendFire() {
 
     Serial.println("[SEND] FIRE!");
 }
-
-// ============================================
-// OLED DISPLAY FUNCTIONS
-// ============================================
-
-#ifdef USE_OLED_DISPLAY
-
-void initDisplay() {
-    if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-        Serial.println("[DISPLAY] SSD1306 allocation failed");
-        return;
-    }
-
-    display.clearDisplay();
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-    display.setCursor(0, 0);
-    display.println("Tank 1990");
-    display.println("Controller");
-    display.println("");
-    display.println("Initializing...");
-    display.display();
-}
-
-void displayMessage(const char* line1, const char* line2) {
-    display.clearDisplay();
-    display.setTextSize(1);
-    display.setCursor(0, 0);
-    display.println("Tank 1990 Controller");
-    display.println("--------------------");
-    display.println("");
-    display.setTextSize(1);
-    display.println(line1);
-    display.println(line2);
-    display.display();
-}
-
-void updateDisplay() {
-    display.clearDisplay();
-    display.setTextSize(1);
-    display.setCursor(0, 0);
-
-    if (!isConnected) {
-        display.println("Tank 1990 Controller");
-        display.println("--------------------");
-        display.println("");
-        display.println("Connecting...");
-        display.println(SERVER_HOST);
-    } else {
-        // Show game stats
-        display.print("HP: ");
-        display.print(health);
-        display.print("/");
-        display.println(maxHealth);
-
-        // Health bar
-        int barWidth = map(health, 0, maxHealth, 0, 80);
-        display.drawRect(0, 12, 82, 6, SSD1306_WHITE);
-        display.fillRect(1, 13, barWidth, 4, SSD1306_WHITE);
-
-        display.setCursor(0, 22);
-        display.print("Score: ");
-        display.println(score);
-
-        display.print("K/D: ");
-        display.print(kills);
-        display.print("/");
-        display.println(deaths);
-
-        display.println("");
-        display.print("Name: ");
-        display.println(TANK_NAME);
-
-        if (spawnProtection) {
-            display.println("[PROTECTED]");
-        }
-    }
-
-    // Show button states at bottom
-    display.setCursor(0, 56);
-    display.print("[");
-    if (btnUp) display.print("U");
-    else display.print(" ");
-    if (btnDown) display.print("D");
-    else display.print(" ");
-    if (btnLeft) display.print("L");
-    else display.print(" ");
-    if (btnRight) display.print("R");
-    else display.print(" ");
-    display.print("]");
-
-    if (btnFire) {
-        display.print(" FIRE!");
-    }
-
-    display.display();
-}
-
-#endif
 
 // ============================================
 // UTILITY FUNCTIONS
