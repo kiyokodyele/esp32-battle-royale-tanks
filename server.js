@@ -30,7 +30,9 @@ const CONFIG = {
     MAX_POWERUPS: 5,
     ADMIN_PASSWORD: 'TankDestroyer',
     BOT_REACTION_TIME: 2000,
-    TICK_RATE: 60
+    TICK_RATE: 60,
+    HEARTBEAT_INTERVAL: 5000,  // Ping every 5 seconds
+    HEARTBEAT_TIMEOUT: 15000   // Disconnect if no pong for 15 seconds
 };
 
 // Game state
@@ -748,6 +750,15 @@ wss.on('connection', (ws, req) => {
         return;
     }
 
+    // Heartbeat tracking
+    ws.isAlive = true;
+    ws.lastPong = Date.now();
+
+    ws.on('pong', () => {
+        ws.isAlive = true;
+        ws.lastPong = Date.now();
+    });
+
     let playerId = null;
     let isAdmin = false;
 
@@ -1081,6 +1092,24 @@ setInterval(spawnObstacle, CONFIG.OBSTACLE_SPAWN_INTERVAL);
 
 // Spawn powerups periodically
 setInterval(() => spawnPowerup(), CONFIG.POWERUP_SPAWN_INTERVAL);
+
+// Heartbeat - detect and remove disconnected clients (unplugged ESP32, etc.)
+setInterval(() => {
+    const now = Date.now();
+    wss.clients.forEach(ws => {
+        // Check if client hasn't responded to pings
+        if (now - ws.lastPong > CONFIG.HEARTBEAT_TIMEOUT) {
+            console.log(`Client timed out (no pong), terminating connection`);
+            ws.terminate(); // Force close, triggers 'close' event
+            return;
+        }
+
+        // Send ping to client
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.ping();
+        }
+    });
+}, CONFIG.HEARTBEAT_INTERVAL);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
