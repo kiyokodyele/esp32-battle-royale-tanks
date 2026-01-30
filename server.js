@@ -906,62 +906,139 @@ wss.on('connection', (ws, req) => {
                         return;
                     }
 
-                    playerId = uuidv4();
-                    const simTank = new Tank(
-                        playerId,
-                        data.name,
-                        data.primaryColor,
-                        data.secondaryColor,
-                        data.avatarUrl
-                    );
-                    gameState.tanks.set(playerId, simTank);
-                    ws.playerId = playerId;
-                    ws.clientIP = clientIP;
+                    // Use deviceId if provided, otherwise use name as identifier
+                    const simDeviceId = data.deviceId || sanitizeTankName(data.name);
 
-                    sendTo(ws, {
-                        type: 'joined',
-                        playerId,
-                        tank: simTank.toJSON(),
-                        config: CONFIG,
-                        gameState: {
-                            tanks: [...gameState.tanks.values()].map(t => t.toJSON()),
-                            bullets: gameState.bullets,
-                            obstacles: gameState.obstacles,
-                            powerups: gameState.powerups,
-                            scoreboard: gameState.scoreboard
+                    // Check if this simulator already has a tank (reconnecting player)
+                    let existingSimTank = null;
+                    let existingSimId = null;
+                    for (const [id, tank] of gameState.tanks.entries()) {
+                        if (tank.deviceId === simDeviceId && !tank.isBot) {
+                            existingSimTank = tank;
+                            existingSimId = id;
+                            break;
                         }
-                    });
+                    }
 
-                    broadcast({ type: 'playerJoined', tank: simTank.toJSON() });
-                    updateScoreboard();
+                    if (existingSimTank) {
+                        // Reconnect to existing tank
+                        playerId = existingSimId;
+                        existingSimTank.ws = ws; // Update active websocket
+                        ws.playerId = playerId;
+                        ws.clientIP = clientIP;
+
+                        sendTo(ws, {
+                            type: 'joined',
+                            playerId,
+                            tank: existingSimTank.toJSON(),
+                            config: CONFIG,
+                            gameState: {
+                                tanks: [...gameState.tanks.values()].map(t => t.toJSON()),
+                                bullets: gameState.bullets,
+                                obstacles: gameState.obstacles,
+                                powerups: gameState.powerups,
+                                scoreboard: gameState.scoreboard
+                            }
+                        });
+
+                        console.log(`Simulator reconnected: ${existingSimTank.name}`);
+                    } else {
+                        // New simulator - create new tank
+                        playerId = uuidv4();
+                        const simTank = new Tank(
+                            playerId,
+                            data.name,
+                            data.primaryColor,
+                            data.secondaryColor,
+                            data.avatarUrl
+                        );
+                        simTank.deviceId = simDeviceId; // Store device identifier
+                        simTank.ws = ws; // Store active websocket
+                        gameState.tanks.set(playerId, simTank);
+                        ws.playerId = playerId;
+                        ws.clientIP = clientIP;
+
+                        sendTo(ws, {
+                            type: 'joined',
+                            playerId,
+                            tank: simTank.toJSON(),
+                            config: CONFIG,
+                            gameState: {
+                                tanks: [...gameState.tanks.values()].map(t => t.toJSON()),
+                                bullets: gameState.bullets,
+                                obstacles: gameState.obstacles,
+                                powerups: gameState.powerups,
+                                scoreboard: gameState.scoreboard
+                            }
+                        });
+
+                        broadcast({ type: 'playerJoined', tank: simTank.toJSON() });
+                        updateScoreboard();
+                        console.log(`Simulator joined: ${data.name}`);
+                    }
                     break;
                 }
 
                 case 'esp32Join': {
                     // ESP32 devices can join directly with their fixed config
                     // They only send commands and don't need game state feedback
-                    playerId = uuidv4();
-                    const espTank = new Tank(
-                        playerId,
-                        data.name,
-                        data.primaryColor,
-                        data.secondaryColor,
-                        data.avatarUrl
-                    );
-                    gameState.tanks.set(playerId, espTank);
-                    ws.playerId = playerId;
-                    ws.clientIP = clientIP;
-                    ws.isESP32 = true;
 
-                    // Send minimal response to ESP32 - just playerId for command identification
-                    sendTo(ws, {
-                        type: 'joined',
-                        playerId
-                    });
+                    // Use deviceId if provided, otherwise use name as identifier
+                    const deviceId = data.deviceId || sanitizeTankName(data.name);
 
-                    broadcast({ type: 'playerJoined', tank: espTank.toJSON() });
-                    updateScoreboard();
-                    console.log(`ESP32 device joined: ${data.name}`);
+                    // Check if this device already has a tank (reconnecting player)
+                    let existingTank = null;
+                    let existingId = null;
+                    for (const [id, tank] of gameState.tanks.entries()) {
+                        if (tank.deviceId === deviceId && !tank.isBot) {
+                            existingTank = tank;
+                            existingId = id;
+                            break;
+                        }
+                    }
+
+                    if (existingTank) {
+                        // Reconnect to existing tank
+                        playerId = existingId;
+                        existingTank.ws = ws; // Update active websocket
+                        ws.playerId = playerId;
+                        ws.clientIP = clientIP;
+                        ws.isESP32 = true;
+
+                        // Send minimal response to ESP32
+                        sendTo(ws, {
+                            type: 'joined',
+                            playerId
+                        });
+
+                        console.log(`ESP32 device reconnected: ${existingTank.name}`);
+                    } else {
+                        // New device - create new tank
+                        playerId = uuidv4();
+                        const espTank = new Tank(
+                            playerId,
+                            data.name,
+                            data.primaryColor,
+                            data.secondaryColor,
+                            data.avatarUrl
+                        );
+                        espTank.deviceId = deviceId; // Store device identifier
+                        espTank.ws = ws; // Store active websocket
+                        gameState.tanks.set(playerId, espTank);
+                        ws.playerId = playerId;
+                        ws.clientIP = clientIP;
+                        ws.isESP32 = true;
+
+                        // Send minimal response to ESP32
+                        sendTo(ws, {
+                            type: 'joined',
+                            playerId
+                        });
+
+                        broadcast({ type: 'playerJoined', tank: espTank.toJSON() });
+                        updateScoreboard();
+                        console.log(`ESP32 device joined: ${data.name}`);
+                    }
                     break;
                 }
             }
@@ -973,10 +1050,13 @@ wss.on('connection', (ws, req) => {
     ws.on('close', () => {
         if (playerId) {
             const tank = gameState.tanks.get(playerId);
-            if (tank && !tank.isBot) {
+            // Only delete if this websocket is still the active one for the tank
+            // (prevents deleting tank when old connection closes after reconnect)
+            if (tank && !tank.isBot && tank.ws === ws) {
                 gameState.tanks.delete(playerId);
                 broadcast({ type: 'playerLeft', playerId });
                 updateScoreboard();
+                console.log(`Player disconnected and removed: ${tank.name}`);
             }
         }
     });

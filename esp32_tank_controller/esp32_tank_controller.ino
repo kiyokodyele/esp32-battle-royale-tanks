@@ -31,11 +31,11 @@
 // ============================================
 
 // WiFi Configuration
-const char* WIFI_SSID = "Internet of Things";
-const char* WIFI_PASSWORD = "09877890";
+const char* WIFI_SSID = "Erza";
+const char* WIFI_PASSWORD = "ErzaKnightw@lk3r";
 
 // Game Server Configuration
-const char* SERVER_HOST = "192.168.1.10";  // Change to your server IP
+const char* SERVER_HOST = "15.235.204.158";  // Change to your server IP
 const int SERVER_PORT = 3000;
 
 // Tank Configuration (Fixed for this device)
