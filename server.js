@@ -1111,7 +1111,27 @@ setInterval(() => {
     });
 }, CONFIG.HEARTBEAT_INTERVAL);
 
-const PORT = process.env.PORT || 3000;
+// Parse command line arguments
+function getPortFromArgs() {
+    const args = process.argv.slice(2);
+    for (let i = 0; i < args.length; i++) {
+        if (args[i] === '--port' || args[i] === '-p') {
+            const port = parseInt(args[i + 1], 10);
+            if (!isNaN(port) && port > 0 && port < 65536) {
+                return port;
+            }
+        }
+        if (args[i].startsWith('--port=')) {
+            const port = parseInt(args[i].split('=')[1], 10);
+            if (!isNaN(port) && port > 0 && port < 65536) {
+                return port;
+            }
+        }
+    }
+    return null;
+}
+
+const PORT = getPortFromArgs() || process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Tank 1990 server running on port ${PORT}`);
     console.log(`Game: http://localhost:${PORT}`);
